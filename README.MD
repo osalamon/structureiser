@@ -2,7 +2,7 @@
 
 [project page](https://dcgi.fel.cvut.cz/~sykorad/structureiser.html) | [paper](https://dcgi.fel.cvut.cz/~sykorad/Spetlik25-EGSR.pdf) | [video](https://www.youtube.com/watch?v=gbgJhk138W8)
 
-This repository accompanies [a paper](https://dcgi.fel.cvut.cz/~sykorad/structureiser.html) accepted to EGSR 2025 (to appear in Computer Graphics Forum 44(4), 2025) by Radim Spetlik, David Futschik, and Daniel Sykora.
+This repository accompanies [a paper](https://onlinelibrary.wiley.com/doi/full/10.1111/cgf.70161) accepted to EGSR 2025 (in Computer Graphics Forum 44(4), 2025) by Radim Spetlik, David Futschik, and Daniel Sykora.
 
 ![Teaser](img/teaser.png)
 
