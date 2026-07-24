@@ -32,7 +32,7 @@ xformers = {version="==0.0.22.post4", index = "torch"}
 open-clip-torch = ">=2.23.0"
 diffusers="*"
 matplotlib="*"
-av="==11.0.0"
+av=">=10,<13"
 tensorboard="*"
 timm="*"
 accelerate="*"
