@@ -1,4 +1,5 @@
 .idea
 __pycache__
-data/dave-highway/
+data/highway-crash/input/
+data/highway-crash/stylized/
 .venv/
