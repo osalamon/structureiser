@@ -9,8 +9,8 @@ verify_ssl = false
 name = "torch"
 
 [packages]
-torch = {version= "==2.1.0", index = "torch"}
-torchvision = {version=">=0.16.0", index = "torch"}
+torch = {version = "==2.4.1", index = "torch"}
+torchvision = {version = "==0.19.1", index = "torch"}
 numpy = "1.*"
 blobfile = "*"
 tqdm = "*"
@@ -24,13 +24,13 @@ scipy = "*"
 imgaug = "*"
 einops = "*"
 omegaconf = "*"
-transformers = ">=4.36"
+transformers = "==4.44.2"
 tokenizers = ">=0.14.1"
 controlnet-aux = "==0.0.3"
 mediapipe = "*"
-xformers = {version="==0.0.22.post4", index = "torch"}
+xformers = {version="==0.0.28", index = "torch"}
 open-clip-torch = ">=2.23.0"
-diffusers="*"
+diffusers="0.29.2"
 matplotlib="*"
 av=">=10,<13"
 tensorboard="*"

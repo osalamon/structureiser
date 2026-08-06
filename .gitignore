@@ -3,3 +3,4 @@ __pycache__
 data/highway-crash/input/
 data/highway-crash/stylized/
 .venv/
+.aider*
