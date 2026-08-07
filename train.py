@@ -721,7 +721,7 @@ class CacheControlProcessor(CachedControlProcessor):
 
 def prepare_cldm(config):
     if config['cldm_type'] == 'lineart':
-        guidance_sd = SDSControlNet(device, fp16=False)
+        guidance_sd = SDSControlNet(device, fp16=True)
         processor = CacheControlProcessor(LineartDetector.from_pretrained("lllyasviel/Annotators"))
     else:
         raise ValueError(f"Unknown CLDM type {config['cldm_type']}")
