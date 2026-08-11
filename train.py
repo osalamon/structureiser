@@ -18,6 +18,8 @@ from tqdm import tqdm
 from omegaconf import OmegaConf
 from einops import repeat, rearrange
 from controlnet_aux import LineartDetector
+from torch.utils.checkpoint import checkpoint
+import torch.cuda.amp as amp
 
 from futscml import (
     pil_loader,
@@ -36,7 +38,7 @@ from futscml.futscml import GramMatrix, guess_model_device, pil_to_np
 
 
 class ImageToImageGenerator_JohnsonFutschik(nn.Module):
-    def __init__(self, norm_layer='batch_norm', use_bias=False, resnet_blocks=9, tanh=False,
+    def __init__(self, norm_layer='batch_norm', use_bias=False, resnet_blocks=4, tanh=False,
                  filters=(64, 128, 128, 128, 128, 64), input_channels=3, output_channels=3,
                  append_blocks=None, blur_pool=False, conv_padding_mode='replicate',
                  config=None, **kwargs):
@@ -117,7 +119,7 @@ class ImageToImageGenerator_JohnsonFutschik(nn.Module):
         output = self.conv2(output_1)
         output_2 = self.conv2(output_1)
         for layer in self.resnets:
-            output = layer(output) + output
+            output = checkpoint(layer, output) + output
 
         output = self.upconv2(torch.cat((output, output_2), dim=1))
         output = self.upconv1(torch.cat((output, output_1), dim=1))
@@ -594,6 +596,8 @@ def train(config, model, iters, key_weight, style_weight, structure_weight, data
 
     control_processor = ControlProcessor(config, processor)
 
+    scaler = amp.GradScaler()
+
     for epoch in trange:
         # Reset to train mode & init random with new seed
         model.train()
@@ -616,36 +620,43 @@ def train(config, model, iters, key_weight, style_weight, structure_weight, data
 
                 pure_y_full = pure_y.clone()
                 if config.use_patches:
+                    # Resize all to a common size (e.g., 128x128) to ensure consistent patch extraction
+                    target_size = (128, 128)  # or use config['patch_size'] * something
+                    keyframe_x = F.interpolate(keyframe_x, size=target_size, mode='bilinear', align_corners=False)
+                    keyframe_y = F.interpolate(keyframe_y, size=target_size, mode='bilinear', align_corners=False)
+                    pure_x = F.interpolate(pure_x, size=target_size, mode='bilinear', align_corners=False)
+                    pure_y = F.interpolate(pure_y, size=target_size, mode='bilinear', align_corners=False)
                     keyframe_x, keyframe_y, pure_x, pure_y = \
                         sampler.cut_patches([keyframe_x, keyframe_y, pure_x, pure_y])
 
                 optimizer.zero_grad()
 
-                with suppress():
+                with amp.autocast():
                     y = model(keyframe_x.clone())
 
-                # L1 Loss Calculation
-                key_loss += key_weight * image_loss(y, keyframe_y)
+                    # L1 Loss Calculation
+                    key_loss += key_weight * image_loss(y, keyframe_y)
 
-                with suppress():
                     frame_y = model(frame_x.clone())
 
-                with suppress():
                     style_loss = style_weight * similarity_loss(frame_y, pure_y_full, cache_y2=True)
                     structure_loss = structure_weight * guidance_sd.train_step(frame_y / 2.0 + 0.5,
                                                                                control_image_0_1,
                                                                                epoch=epoch,
                                                                                inference_step=config['inference_step'])
 
-                # Track values for logging
-                error = style_loss + structure_loss + key_loss
+                    # Track values for logging
+                    error = style_loss + structure_loss + key_loss
 
                 tracked_scalars = ['image_error', 'similarity_error', 'sds_loss', 'error']
                 scalars = {name: value for name, value in locals().items() if name in tracked_scalars}
                 log.log_multiple_scalars(scalars, epoch)
 
-                error.backward()
-                optimizer.step()
+                scaler.scale(error).backward()
+                scaler.step(optimizer)
+                scaler.update()
+
+                torch.cuda.empty_cache()
 
                 trange.set_postfix({'err': f'{error:0.5f}',
                                     'key': f'{key_loss:0.5f}',
@@ -721,7 +732,7 @@ class CacheControlProcessor(CachedControlProcessor):
 
 def prepare_cldm(config):
     if config['cldm_type'] == 'lineart':
-        guidance_sd = SDSControlNet(device, fp16=False)
+        guidance_sd = SDSControlNet(device, fp16=True)
         processor = CacheControlProcessor(LineartDetector.from_pretrained("lllyasviel/Annotators"))
     else:
         raise ValueError(f"Unknown CLDM type {config['cldm_type']}")
@@ -804,8 +815,9 @@ if __name__ == "__main__":
     device = config['device']
     storage_to_cpu = False
     transform = ImageTensorConverter(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5],
-                                     resize=f'flex;8;max;{config["resize"]}' if config["resize"] is not None else f'flex;8',
-                                     drop_alpha=True)
+                                     resize='128', drop_alpha=True)
+    # Reduce model capacity to fit in 3.68 GiB VRAM
+    config['model_params']['resnet_blocks'] = 4
     model = ImageToImageGenerator_JohnsonFutschik(config=config, **config['model_params'])
 
     data_aux = InferDataset(frames_dir, transform)
@@ -817,7 +829,8 @@ if __name__ == "__main__":
     def worker_init_fn(worker_id):
         np.random.seed(np.random.get_state()[1][0] + worker_id)
 
-    batch_size = config['batch_size']
+    batch_size = 1  # Force batch size 1 to reduce memory
+    config['batch_size'] = batch_size
     collate = lambda x: [torch.utils.data.dataloader.default_collate(x).to(device) for x in x]
     trainset = DataLoader(data_train, num_workers=0, worker_init_fn=worker_init_fn)
     auxset = DataLoader(data_aux, num_workers=0, worker_init_fn=worker_init_fn, batch_size=batch_size, drop_last=False)
@@ -842,4 +855,3 @@ if __name__ == "__main__":
     train(config, model, config['iters'], key_weight, style_weight, structure_weight,
           trainset, auxset, testset,
           transform, device, log)
-

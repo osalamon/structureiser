@@ -39,26 +39,35 @@ class SDSControlNet(nn.Module):
 
         self.dtype = torch.bfloat16 if fp16 else torch.float32
 
-        # Create model
-        controlnet = ControlNetModel.from_pretrained(checkpoint, torch_dtype=self.dtype)
-        pipe = StableDiffusionControlNetPipeline.from_pretrained(
-            model_key, controlnet=controlnet, torch_dtype=self.dtype
-        )
-
-        if vram_O:
-            pipe.enable_sequential_cpu_offload()
-            pipe.enable_vae_slicing()
-            pipe.unet.to(memory_format=torch.channels_last)
-            pipe.enable_attention_slicing(1)
-            # pipe.enable_model_cpu_offload()
-        else:
-            pipe.to(device)
-
-        self.vae = pipe.vae
-        self.tokenizer = pipe.tokenizer
-        self.text_encoder = pipe.text_encoder
-        self.unet = pipe.unet
-        self.controlnet = pipe.controlnet
+        # Create model                                                                                                                             
+        controlnet = ControlNetModel.from_pretrained(checkpoint, torch_dtype=self.dtype)                                                           
+        pipe = StableDiffusionControlNetPipeline.from_pretrained(                                                                                  
+            model_key,                                                                                                                             
+            controlnet=controlnet,                                                                                                                 
+            torch_dtype=self.dtype,          # use self.dtype consistently                                                                         
+            safety_checker=None,                                                                                                                   
+            feature_extractor=None,                                                                                                                
+        )                                                                                                                                          
+                                                                                                                                                    
+        # Enable memory‑saving features BEFORE moving to GPU                                                                                       
+        pipe.enable_attention_slicing()                                                                                                            
+        pipe.enable_vae_slicing()                                                                                                                  
+                                                                                                                                                    
+        if vram_O:                                                                                                                                 
+            pipe.enable_sequential_cpu_offload()                                                                                                   
+            pipe.unet.to(memory_format=torch.channels_last)                                                                                        
+            # pipe.enable_model_cpu_offload()                                                                                                      
+        else:                                                                                                                                      
+            pipe.to(device)                                                                                                                        
+                                                                                                                                                    
+        # Now assign to self.pipe                                                                                                                  
+        self.pipe = pipe                                                                                                                           
+                                                                                                                                                    
+        self.vae = pipe.vae                                                                                                                        
+        self.tokenizer = pipe.tokenizer                                                                                                            
+        self.text_encoder = pipe.text_encoder                                                                                                      
+        self.unet = pipe.unet                                                                                                                      
+        self.controlnet = pipe.controlnet   
 
         # self.scheduler = DDIMScheduler.from_pretrained(
         #     model_key, subfolder="scheduler", torch_dtype=self.dtype
