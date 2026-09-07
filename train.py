@@ -688,7 +688,6 @@ def train(config, model, iters, key_weight, style_weight, structure_weight, data
                 log_verification_video(config, log, epoch, 'Auxiliary Frames', model, dataset_aux, transform, frame_x.shape,
                                        max_frames=None)
                 log.flush()
-                log.log_checkpoint({'state_dict': model.state_dict(), 'opt_dict': optimizer.state_dict()}, 'latest'i)
     log.log_checkpoint({'state_dict': model.state_dict(), 'opt_dict': optimizer.state_dict()}, 'latest')
 
 
