@@ -565,6 +565,8 @@ def train(config, model, iters, key_weight, style_weight, structure_weight, data
           dataset_val, transform, device, log):
     model.to(device)
 
+    print(f"Model device: {next(model.parameters()).device}") 
+
     if key_weight > 0.:
         image_loss = ImageLoss()
 
@@ -686,7 +688,7 @@ def train(config, model, iters, key_weight, style_weight, structure_weight, data
                 log_verification_video(config, log, epoch, 'Auxiliary Frames', model, dataset_aux, transform, frame_x.shape,
                                        max_frames=None)
                 log.flush()
-                log.log_checkpoint({'state_dict': model.state_dict(), 'opt_dict': optimizer.state_dict()}, 'latest')
+                log.log_checkpoint({'state_dict': model.state_dict(), 'opt_dict': optimizer.state_dict()}, 'latest'i)
     log.log_checkpoint({'state_dict': model.state_dict(), 'opt_dict': optimizer.state_dict()}, 'latest')
 
 
