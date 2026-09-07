@@ -615,9 +615,14 @@ def train(config, model, iters, key_weight, style_weight, structure_weight, data
                 frame_x = frame_x.to(device)
 
                 pure_y_full = pure_y.clone()
-                if config.use_patches:
-                    keyframe_x, keyframe_y, pure_x, pure_y = \
-                        sampler.cut_patches([keyframe_x, keyframe_y, pure_x, pure_y])
+                if config.use_patches:                                                                                                                     
+                    # Ensure all images have the same spatial dimensions for patch extraction                                                              
+                    target_h, target_w = keyframe_x.shape[-2:]                                                                                             
+                    keyframe_x = F.interpolate(keyframe_x, size=(target_h, target_w), mode='bilinear', align_corners=False)                                
+                    keyframe_y = F.interpolate(keyframe_y, size=(target_h, target_w), mode='bilinear', align_corners=False)                                
+                    pure_x = F.interpolate(pure_x, size=(target_h, target_w), mode='bilinear', align_corners=False)                                        
+                    pure_y = F.interpolate(pure_y, size=(target_h, target_w), mode='bilinear', align_corners=False)                                        
+                    keyframe_x, keyframe_y, pure_x, pure_y = sampler.cut_patches([keyframe_x, keyframe_y, pure_x, pure_y])  
 
                 optimizer.zero_grad()
 
