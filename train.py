@@ -573,7 +573,6 @@ def train(config, model, iters, key_weight, style_weight, structure_weight, data
     params_to_optimize = list(model.parameters())
 
     optimizer = opt.AdamW(params_to_optimize, lr=3e-5)  # RMSprop works at 2e-4
-    scaler = torch.cuda.amp.GradScaler()
     aux_sample = InfiniteDatasetSampler(dataset_aux)
     ebest = float('inf')
 
@@ -629,13 +628,13 @@ def train(config, model, iters, key_weight, style_weight, structure_weight, data
 
                 optimizer.zero_grad()
 
-                with torch.cuda.amp.autocast():
+                with suppress():
                     y = model(keyframe_x.clone())
 
                 # L1 Loss Calculation
                 key_loss += key_weight * image_loss(y, keyframe_y)
 
-                with torch.cuda.amp.autocast():
+                with suppress():
                     frame_y = model(frame_x.clone())
 
                 with suppress():
@@ -652,12 +651,8 @@ def train(config, model, iters, key_weight, style_weight, structure_weight, data
                 scalars = {name: value for name, value in locals().items() if name in tracked_scalars}
                 log.log_multiple_scalars(scalars, epoch)
 
-                # error.backward()
-                # optimizer.step()
-
-                scaler.scale(error).backward()                                                                                                                                      
-                scaler.step(optimizer)                                                                                                                                              
-                scaler.update() 
+                error.backward()
+                optimizer.step()
 
                 trange.set_postfix({'err': f'{error:0.5f}',
                                     'key': f'{key_loss:0.5f}',
